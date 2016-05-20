@@ -70,14 +70,57 @@ static int inject_message(void *parent, const char *pb, size_t pb_len)
     return go_lua_inject_message(parent, pb_copy, pb_len);
 }
 
+void heka_log(void *context,
+              const char *component,
+              int level,
+              const char *fmt,
+              ...)
+{
+    const char *severity;
+    switch (level) {
+    case 7:
+        severity = "debug";
+        break;
+    case 6:
+        severity = "info";
+        break;
+    case 5:
+        severity = "notice";
+        break;
+    case 4:
+        severity = "warning";
+        break;
+    case 3:
+        severity = "error";
+        break;
+    case 2:
+        severity = "crit";
+        break;
+    case 1:
+        severity = "alert";
+        break;
+    case 0:
+        severity = "panic";
+        break;
+    default:
+        severity = "debug";
+        break;
+    }
+
+    int len = strlen(fmt) + strlen(severity) + 5;
+    char str[len];
+    snprintf(str, len, "[%s] %s\n", severity, fmt);
+    go_lua_log(str);
+}
+
 lsb_heka_sandbox* heka_create_sandbox(void *parent,
                                       const char *lua_file,
                                       const char *state_file,
-                                      const char *lsb_cfg,
-                                      lsb_logger *logger)
+                                      const char *lsb_cfg)
 {
-    lsb_heka_create_analysis(parent, lua_file, state_file, lsb_cfg, logger,
-                             inject_message);
+    lsb_logger logger = {.context = NULL, .cb = heka_log};
+    return lsb_heka_create_analysis(parent, lua_file, state_file, lsb_cfg, &logger,
+                                    inject_message);
 }
 
 

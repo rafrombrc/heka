@@ -33,8 +33,7 @@ size_t heka_lsb_usage(lsb_heka_sandbox* hsb, lsb_usage_type utype, lsb_usage_sta
 lsb_heka_sandbox* heka_create_sandbox(void *parent,
                                       const char *lua_file,
                                       const char *state_file,
-                                      const char *lsb_cfg,
-                                      lsb_logger *logger);
+                                      const char *lsb_cfg);
 
 /**
 * Passes a Heka message down to the sandbox for processing. The instruction

@@ -72,6 +72,11 @@ func go_lua_inject_message(ptr unsafe.Pointer, payload *C.char, payload_len C.in
 	return lsb.injectMessage(C.GoStringN(payload, payload_len))
 }
 
+//export go_lua_log
+func go_lua_log(output *C.char) {
+	log.Println(C.GoString(output))
+}
+
 type LuaSandbox struct {
 	hsb           *C.lsb_heka_sandbox
 	injectMessage func(payload string) int
@@ -104,7 +109,7 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 	ccfg := C.CString(cfg)
 	defer C.free(unsafe.Pointer(ccfg))
 
-	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), cs, cstateFile, ccfg, nil)
+	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), cs, cstateFile, ccfg)
 
 	if lsb.hsb == nil {
 		return nil, fmt.Errorf("Sandbox creation failed")
