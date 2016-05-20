@@ -99,21 +99,19 @@ func (this *SandboxFilter) Init(config interface{}) (err error) {
 		}
 	}
 
+	this.preservationFile = filepath.Join(data_dir, this.name+DATA_EXT)
 	switch this.sbc.ScriptType {
 	case "lua":
-		this.sb, err = lua.CreateLuaSandbox(this.sbc)
+		stateFile := ""
+		if this.sbc.PreserveData && fileExists(this.preservationFile) {
+			stateFile = this.preservationFile
+		}
+		this.sb, err = lua.CreateLuaSandbox(this.sbc, stateFile)
 		if err != nil {
 			return
 		}
 	default:
 		return fmt.Errorf("unsupported script type: %s", this.sbc.ScriptType)
-	}
-
-	this.preservationFile = filepath.Join(data_dir, this.name+DATA_EXT)
-	if this.sbc.PreserveData && fileExists(this.preservationFile) {
-		err = this.sb.Init(this.preservationFile)
-	} else {
-		err = this.sb.Init("")
 	}
 
 	return
@@ -191,7 +189,7 @@ func (this *SandboxFilter) Run(fr pipeline.FilterRunner, h pipeline.PluginHelper
 	}
 	// We assign to the return value of Run() for errors in the closure so that
 	// the plugin runner can determine what caused the SandboxFilter to return.
-	this.sb.InjectMessage(func(payload, payload_type, payload_name string) int {
+	this.sb.InjectMessage(func(payload string) int {
 		if injectionCount == 0 {
 			err = pipeline.TerminatedError("exceeded InjectMessage count")
 			return 2
@@ -206,25 +204,16 @@ func (this *SandboxFilter) Run(fr pipeline.FilterRunner, h pipeline.PluginHelper
 				return 3
 			}
 		}
-		if len(payload_type) == 0 { // heka protobuf message
-			hostname := pack.Message.GetHostname()
-			err := proto.Unmarshal([]byte(payload), pack.Message)
-			if err == nil {
-				// do not allow filters to override the following
-				pack.Message.SetType("heka.sandbox." + pack.Message.GetType())
-				pack.Message.SetLogger(fr.Name())
-				pack.Message.SetHostname(hostname)
-			} else {
-				return 1
-			}
-		} else {
-			pack.Message.SetType("heka.sandbox-output")
+
+		hostname := pack.Message.GetHostname()
+		err := proto.Unmarshal([]byte(payload), pack.Message)
+		if err == nil {
+			// do not allow filters to override the following
+			pack.Message.SetType("heka.sandbox." + pack.Message.GetType())
 			pack.Message.SetLogger(fr.Name())
-			pack.Message.SetPayload(payload)
-			ptype, _ := message.NewField("payload_type", payload_type, "file-extension")
-			pack.Message.AddField(ptype)
-			pname, _ := message.NewField("payload_name", payload_name, "")
-			pack.Message.AddField(pname)
+			pack.Message.SetHostname(hostname)
+		} else {
+			return 1
 		}
 		if !fr.Inject(pack) {
 			return 4
@@ -372,12 +361,7 @@ func (this *SandboxFilter) destroy() error {
 
 	var err error
 	if this.sb != nil {
-		if this.sbc.PreserveData {
-			err = this.sb.Destroy(this.preservationFile)
-		} else {
-			err = this.sb.Destroy("")
-		}
-
+		err = this.sb.Destroy()
 		this.sb = nil
 	}
 	this.reportLock.Unlock()

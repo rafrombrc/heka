@@ -9,7 +9,12 @@
 #define lua_sandbox_interface_
 
 #include <luasandbox.h>
+#include <luasandbox/util/running_stats.h>
+#include <luasandbox/util/heka_message.h>
+#include <luasandbox/util/output_buffer.h>
+#include <luasandbox/heka/sandbox.h>
 #include <luasandbox/lua.h>
+#include <luasandbox/lualib.h>
 
 // LMW_ERR_*: Lua Message Write errors
 extern const int LMW_ERR_NO_SANDBOX_PACK;
@@ -19,84 +24,27 @@ extern const int LMW_ERR_BAD_FIELD_INDEX;
 extern const int LMW_ERR_BAD_ARRAY_INDEX;
 extern const int LMW_ERR_INVALID_FIELD_NAME;
 
+lsb_state heka_lsb_get_state(lsb_heka_sandbox* hsb);
+
+const char* heka_lsb_get_error(lsb_heka_sandbox* hsb);
+
+size_t heka_lsb_usage(lsb_heka_sandbox* hsb, lsb_usage_type utype, lsb_usage_stat ustat);
+
+lsb_heka_sandbox* heka_create_sandbox(void *parent,
+                                      const char *lua_file,
+                                      const char *state_file,
+                                      const char *lsb_cfg,
+                                      lsb_logger *logger);
+
 /**
 * Passes a Heka message down to the sandbox for processing. The instruction
 * count limits are active during this call.
 *
-* @param lsb Pointer to the sandbox
+* @param hsb Pointer to the Heka sandbox
+* @param pb Pointer to protobuf encoding of Heka message
 *
 * @return int Zero on success, non-zero on failure.
 */
-int process_message(lua_sandbox* lsb);
-
-/**
-* Called when the plugin timer expires (the garbage collector is run after
-* its execution). The instruction count limits are active during this call.
-*
-* @param lsb Pointer to the sandbox.
-*
-* @return int Zero on success, non-zero on failure.
-*
-*/
-int timer_event(lua_sandbox* lsb, long long ns);
-
-/**
-* Reads a configuration variable provided in the Heka toml and returns the
-* value.
-*
-* @param lua Pointer to the Lua state.
-*
-* @return int Returns one value on the stack.
-*/
-int read_config(lua_State* lua);
-
-/**
-* Reads a data field from a Heka message and returns the value.
-*
-* @param lua Pointer to the Lua state.
-*
-* @return int Returns one value on the stack.
-*/
-int read_message(lua_State* lua);
-
-/**
- * Iterates through the message fields returning the type, name, value,
- * representation, and count for each field.
- *
- * @param lua Pointer to the Lua state.
- *
- * @return int Returns five values on the stack.
- */
-int read_next_field(lua_State* lua);
-
-/**
-* Inject a message into Heka using the output buffer's contents as the message
-* payload.
-*
-* @param lua Pointer to the Lua state.
-*
-* @return int Returns zero values on the stack.
-*/
-int inject_message(lua_State* lua);
-
-/**
- * Initializes the sandbox and sets up the above callbacks.
- *
- * @param lsb Pointer to the sandbox.
- * @param data_file File used for the data restoration (empty or NULL for no
- *                  restoration)
- *
- * @return int 0 on success
- */
-int sandbox_init(lua_sandbox* lsb, const char* data_file, const char* plugin_type);
-
-/**
- * Sends a shutdown message to the sandbox.
- *
- * @param lsb Pointer to the sandbox.
- *
- */
-void sandbox_stop(lua_sandbox* lsb);
-
+int heka_process_message(lsb_heka_sandbox* hsb, const char* pb);
 #endif
 

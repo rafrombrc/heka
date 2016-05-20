@@ -89,7 +89,7 @@ elseif(UNIX)
     if(NOT CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
         set(LINK_DL "-ldl")
     endif()
-    set(CGO_LDFLAGS "cgo LDFLAGS: -Wl,-rpath,$ORIGIN/../lib ${LUA_LIB_PATH}/libluasandbox.so ${LUA_LIB_PATH}/libluasb.so ${LINK_DL} -lm")
+    set(CGO_LDFLAGS "cgo LDFLAGS: -Wl,-rpath,$ORIGIN/../lib -L${LUA_LIB_PATH} -lluasandbox -lluasb -lluasandboxheka -lluasandboxutil ${LINK_DL} -lm")
 
     find_program(DPKG_EXECUTABLE dpkg PATH_SUFFIXES bin)
 

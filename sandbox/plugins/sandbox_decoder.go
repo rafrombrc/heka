@@ -147,33 +147,31 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 	var original *message.Message
 	var err error
 
+	s.preservationFile = filepath.Join(s.pConfig.Globals.PrependBaseDir(DATA_DIR),
+		dr.Name()+DATA_EXT)
+
 	switch s.sbc.ScriptType {
 	case "lua":
-		s.sb, err = lua.CreateLuaSandbox(s.sbc)
+		stateFile := ""
+		if s.sbc.PreserveData && fileExists(s.preservationFile) {
+			stateFile = s.preservationFile
+		}
+		s.sb, err = lua.CreateLuaSandbox(s.sbc, stateFile)
 	default:
 		err = fmt.Errorf("unsupported script type: %s", s.sbc.ScriptType)
 	}
 
-	if err == nil {
-		s.preservationFile = filepath.Join(s.pConfig.Globals.PrependBaseDir(DATA_DIR),
-			dr.Name()+DATA_EXT)
-		if s.sbc.PreserveData && fileExists(s.preservationFile) {
-			err = s.sb.Init(s.preservationFile)
-		} else {
-			err = s.sb.Init("")
-		}
-	}
 	if err != nil {
 		dr.LogError(err)
 		if s.sb != nil {
-			s.sb.Destroy("")
+			s.sb.Destroy()
 			s.sb = nil
 		}
 		s.pConfig.Globals.ShutDown(1)
 		return
 	}
 
-	s.sb.InjectMessage(func(payload, payload_type, payload_name string) int {
+	s.sb.InjectMessage(func(payload string) int {
 		if s.pack == nil {
 			s.pack = dr.NewPack()
 			if s.pack == nil {
@@ -185,40 +183,33 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 		} else {
 			original = nil // processing a new message, clear the old message
 		}
-		if len(payload_type) == 0 { // heka protobuf message
-			// write protobuf encoding to MsgBytes
-			needed := len(payload)
-			if cap(s.pack.MsgBytes) < needed {
-				s.pack.MsgBytes = make([]byte, len(payload))
-			} else {
-				s.pack.MsgBytes = s.pack.MsgBytes[:len(payload)]
-			}
-			copy(s.pack.MsgBytes, payload)
-			s.pack.TrustMsgBytes = true
 
-			if original == nil {
-				original = new(message.Message)
-				copyMessageHeaders(original, s.pack.Message) // save off the header values since unmarshal will wipe them out
-			}
-			if nil != proto.Unmarshal(s.pack.MsgBytes, s.pack.Message) {
-				return 1
-			}
-			if s.tz != time.UTC {
-				const layout = "2006-01-02T15:04:05.999999999" // remove the incorrect UTC tz info
-				t := time.Unix(0, s.pack.Message.GetTimestamp())
-				t = t.In(time.UTC)
-				ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
-				s.pack.Message.SetTimestamp(ct.UnixNano())
-				s.pack.TrustMsgBytes = false
-			}
+		// write protobuf encoding to MsgBytes
+		needed := len(payload)
+		if cap(s.pack.MsgBytes) < needed {
+			s.pack.MsgBytes = make([]byte, len(payload))
 		} else {
-			s.pack.TrustMsgBytes = false
-			s.pack.Message.SetPayload(payload)
-			ptype, _ := message.NewField("payload_type", payload_type, "file-extension")
-			s.pack.Message.AddField(ptype)
-			pname, _ := message.NewField("payload_name", payload_name, "")
-			s.pack.Message.AddField(pname)
+			s.pack.MsgBytes = s.pack.MsgBytes[:len(payload)]
 		}
+		copy(s.pack.MsgBytes, payload)
+		s.pack.TrustMsgBytes = true
+
+		if original == nil {
+			original = new(message.Message)
+			copyMessageHeaders(original, s.pack.Message) // save off the header values since unmarshal will wipe them out
+		}
+		if nil != proto.Unmarshal(s.pack.MsgBytes, s.pack.Message) {
+			return 1
+		}
+		if s.tz != time.UTC {
+			const layout = "2006-01-02T15:04:05.999999999" // remove the incorrect UTC tz info
+			t := time.Unix(0, s.pack.Message.GetTimestamp())
+			t = t.In(time.UTC)
+			ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
+			s.pack.Message.SetTimestamp(ct.UnixNano())
+			s.pack.TrustMsgBytes = false
+		}
+
 		if original != nil {
 			// if future injections fail to set the standard headers, use the values
 			// from the original message.
@@ -269,11 +260,7 @@ func (s *SandboxDecoder) destroy() error {
 
 	var err error
 	if s.sb != nil {
-		if s.sbc.PreserveData {
-			err = s.sb.Destroy(s.preservationFile)
-		} else {
-			err = s.sb.Destroy("")
-		}
+		err = s.sb.Destroy()
 		s.sb = nil
 	}
 	s.reportLock.Unlock()

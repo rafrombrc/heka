@@ -75,21 +75,19 @@ func (s *SandboxOutput) Init(config interface{}) (err error) {
 		}
 	}
 
+	s.preservationFile = filepath.Join(data_dir, s.name+DATA_EXT)
 	switch s.sbc.ScriptType {
 	case "lua":
-		s.sb, err = lua.CreateLuaSandbox(s.sbc)
+		stateFile := ""
+		if s.sbc.PreserveData && fileExists(s.preservationFile) {
+			stateFile = s.preservationFile
+		}
+		s.sb, err = lua.CreateLuaSandbox(s.sbc, stateFile)
 		if err != nil {
 			return
 		}
 	default:
 		return fmt.Errorf("unsupported script type: %s", s.sbc.ScriptType)
-	}
-
-	s.preservationFile = filepath.Join(data_dir, s.name+DATA_EXT)
-	if s.sbc.PreserveData && fileExists(s.preservationFile) {
-		err = s.sb.Init(s.preservationFile)
-	} else {
-		err = s.sb.Init("")
 	}
 
 	s.sample = true
@@ -179,11 +177,7 @@ func (s *SandboxOutput) destroy() error {
 	var err error
 	s.reportLock.Lock()
 	if s.sb != nil {
-		if s.sbc.PreserveData {
-			err = s.sb.Destroy(s.preservationFile)
-		} else {
-			err = s.sb.Destroy("")
-		}
+		err = s.sb.Destroy()
 		s.sb = nil
 	}
 	s.reportLock.Unlock()

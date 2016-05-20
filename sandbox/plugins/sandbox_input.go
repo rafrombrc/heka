@@ -80,21 +80,19 @@ func (s *SandboxInput) Init(config interface{}) (err error) {
 		}
 	}
 
+	s.preservationFile = filepath.Join(data_dir, s.name+DATA_EXT)
 	switch s.sbc.ScriptType {
 	case "lua":
-		s.sb, err = lua.CreateLuaSandbox(s.sbc)
+		stateFile := ""
+		if s.sbc.PreserveData && fileExists(s.preservationFile) {
+			stateFile = s.preservationFile
+		}
+		s.sb, err = lua.CreateLuaSandbox(s.sbc, stateFile)
 		if err != nil {
 			return
 		}
 	default:
 		return fmt.Errorf("unsupported script type: %s", s.sbc.ScriptType)
-	}
-
-	s.preservationFile = filepath.Join(data_dir, s.name+DATA_EXT)
-	if s.sbc.PreserveData && fileExists(s.preservationFile) {
-		err = s.sb.Init(s.preservationFile)
-	} else {
-		err = s.sb.Init("")
 	}
 	s.stopChan = make(chan struct{})
 
@@ -103,7 +101,7 @@ func (s *SandboxInput) Init(config interface{}) (err error) {
 
 func (s *SandboxInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) (err error) {
 	abortChan := s.pConfig.Globals.AbortChan()
-	s.sb.InjectMessage(func(payload, payload_type, payload_name string) int {
+	s.sb.InjectMessage(func(payload string) int {
 		var pack *pipeline.PipelinePack
 		select {
 		case pack = <-ir.InChan():
@@ -111,7 +109,16 @@ func (s *SandboxInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) (er
 			pack.Recycle(nil)
 			return 5
 		}
-		if err := proto.Unmarshal([]byte(payload), pack.Message); err != nil {
+		needed := len(payload)
+		if cap(pack.MsgBytes) < needed {
+			pack.MsgBytes = make([]byte, len(payload))
+		} else {
+			pack.MsgBytes = pack.MsgBytes[:len(payload)]
+		}
+		copy(pack.MsgBytes, payload)
+		pack.TrustMsgBytes = true
+
+		if err := proto.Unmarshal(pack.MsgBytes, pack.Message); err != nil {
 			pack.Recycle(nil)
 			return 1
 		}
@@ -121,6 +128,7 @@ func (s *SandboxInput) Run(ir pipeline.InputRunner, h pipeline.PluginHelper) (er
 			t = t.In(time.UTC)
 			ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
 			pack.Message.SetTimestamp(ct.UnixNano())
+			pack.TrustMsgBytes = false
 		}
 		if err := ir.Inject(pack); err != nil {
 			pack.Recycle(nil)
@@ -169,11 +177,7 @@ func (s *SandboxInput) destroy() error {
 
 	s.reportLock.Lock()
 	if s.sb != nil {
-		if s.sbc.PreserveData {
-			err = s.sb.Destroy(s.preservationFile)
-		} else {
-			err = s.sb.Destroy("")
-		}
+		err = s.sb.Destroy()
 		s.sb = nil
 	}
 	s.reportLock.Unlock()

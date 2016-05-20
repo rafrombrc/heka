@@ -35,9 +35,9 @@ const (
 
 type Sandbox interface {
 	// Sandbox control
-	Init(dataFile string) error
+	// Init(dataFile string) error
 	Stop()
-	Destroy(dataFile string) error
+	Destroy() error
 
 	// Sandbox state
 	Status() int
@@ -49,7 +49,7 @@ type Sandbox interface {
 	TimerEvent(ns int64) int
 
 	// Go callback
-	InjectMessage(f func(payload, payload_type, payload_name string) int)
+	InjectMessage(f func(payload string) int)
 }
 
 type SandboxConfig struct {

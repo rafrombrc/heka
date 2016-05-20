@@ -24,6 +24,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/gogo/protobuf/proto"
 	"github.com/mozilla-services/heka/client"
 	"github.com/mozilla-services/heka/message"
 	"github.com/mozilla-services/heka/pipeline"
@@ -120,9 +121,14 @@ func (s *SandboxEncoder) Init(config interface{}) (err error) {
 		}
 	}
 
+	s.preservationFile = filepath.Join(dataDir, s.name+sandbox.DATA_EXT)
 	switch s.sbc.ScriptType {
 	case "lua":
-		s.sb, err = lua.CreateLuaSandbox(s.sbc)
+		stateFile := ""
+		if s.sbc.PreserveData && fileExists(s.preservationFile) {
+			stateFile = s.preservationFile
+		}
+		s.sb, err = lua.CreateLuaSandbox(s.sbc, stateFile)
 	default:
 		return fmt.Errorf("Unsupported script type: %s", s.sbc.ScriptType)
 	}
@@ -131,19 +137,14 @@ func (s *SandboxEncoder) Init(config interface{}) (err error) {
 		return fmt.Errorf("Sandbox creation failed: '%s'", err)
 	}
 
-	s.preservationFile = filepath.Join(dataDir, s.name+sandbox.DATA_EXT)
-	if s.sbc.PreserveData && fileExists(s.preservationFile) {
-		err = s.sb.Init(s.preservationFile)
-	} else {
-		err = s.sb.Init("")
-	}
-	if err != nil {
-		return fmt.Errorf("Sandbox initialization failed: %s", err)
-	}
-
-	s.sb.InjectMessage(func(payload, payload_type, payload_name string) int {
+	s.sb.InjectMessage(func(payload string) int {
 		s.injected = true
-		s.output = []byte(payload)
+		pb := []byte(payload)
+		msg := new(message.Message)
+		if proto.Unmarshal(pb, msg) != nil {
+			return 1
+		}
+		s.output = []byte(msg.GetPayload())
 		return 0
 	})
 	s.sample = true
@@ -154,11 +155,7 @@ func (s *SandboxEncoder) Init(config interface{}) (err error) {
 func (s *SandboxEncoder) Stop() {
 	s.reportLock.Lock()
 	if s.sb != nil {
-		if s.sbc.PreserveData {
-			s.sb.Destroy(s.preservationFile)
-		} else {
-			s.sb.Destroy("")
-		}
+		s.sb.Destroy()
 		s.sb = nil
 	}
 	s.reportLock.Unlock()
