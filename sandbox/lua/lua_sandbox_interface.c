@@ -19,18 +19,6 @@
 #include <time.h>
 #include "_cgo_export.h"
 
-struct lsb_lua_sandbox {
-  lua_State         *lua;
-  void              *parent;
-  char              *lua_file;
-  char              *state_file;
-  lsb_logger        logger;
-  lsb_state         state;
-  lsb_output_buffer output;
-  size_t            usage[LSB_UT_MAX][LSB_US_MAX];
-  char              error_message[LSB_ERROR_SIZE];
-};
-
 struct heka_stats {
   unsigned long long im_cnt;
   unsigned long long im_bytes;
@@ -41,7 +29,6 @@ struct heka_stats {
   lsb_running_stats pm;
   lsb_running_stats te;
 };
-
 
 struct lsb_heka_sandbox {
   void                              *parent;
@@ -66,8 +53,7 @@ struct lsb_heka_sandbox {
 ////////////////////////////////////////////////////////////////////////////////
 static int inject_message(void *parent, const char *pb, size_t pb_len)
 {
-    char *pb_copy = pb;  // Probably need to actually do a memcopy here.
-    return go_lua_inject_message(parent, pb_copy, pb_len);
+    return go_lua_inject_message(parent, (char*)pb, pb_len);
 }
 
 void heka_log(void *context,
@@ -107,18 +93,25 @@ void heka_log(void *context,
         break;
     }
 
-    int len = strlen(fmt) + strlen(severity) + 5;
+    char var_str[500];
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(var_str, 500, fmt, args);
+    va_end(args);
+
+    int len = strlen(var_str) + strlen(severity) + 5;
     char str[len];
-    snprintf(str, len, "[%s] %s\n", severity, fmt);
+    snprintf(str, len, "[%s] %s\n", severity, var_str);
     go_lua_log(str);
 }
+
+lsb_logger logger = {.context = NULL, .cb = heka_log};
 
 lsb_heka_sandbox* heka_create_sandbox(void *parent,
                                       const char *lua_file,
                                       const char *state_file,
                                       const char *lsb_cfg)
 {
-    lsb_logger logger = {.context = NULL, .cb = heka_log};
     return lsb_heka_create_analysis(parent, lua_file, state_file, lsb_cfg, &logger,
                                     inject_message);
 }
@@ -132,7 +125,7 @@ lsb_state heka_lsb_get_state(lsb_heka_sandbox* hsb)
 
 const char* heka_lsb_get_error(lsb_heka_sandbox* hsb)
 {
-    return hsb ? hsb->lsb->error_message : "";
+    return hsb ? lsb_get_error(hsb->lsb) : "";
 }
 
 size_t heka_lsb_usage(lsb_heka_sandbox* hsb, lsb_usage_type utype, lsb_usage_stat ustat)
@@ -146,7 +139,7 @@ int heka_process_message(lsb_heka_sandbox* hsb, const char* pb)
 
     lsb_heka_message m;
     lsb_init_heka_message(&m, 2);
-    bool rv = lsb_decode_heka_message(&m, pb, sizeof(pb)-1, NULL);
+    bool rv = lsb_decode_heka_message(&m, pb, strlen(pb), &logger);
     if (!rv) return 1;
     return lsb_heka_pm_analysis(hsb, &m, 0);
 }

@@ -291,7 +291,7 @@ func (s *SandboxDecoder) Decode(pack *pipeline.PipelinePack) (packs []*pipeline.
 	}
 	s.sample = 0 == rand.Intn(s.sampleDenominator)
 	if retval > 0 {
-		err = fmt.Errorf("FATAL: %s", s.sb.LastError())
+		err = fmt.Errorf("FATAL (%d): %s", retval, s.sb.LastError())
 		s.dRunner.LogError(err)
 		s.pConfig.Globals.ShutDown(1)
 	}

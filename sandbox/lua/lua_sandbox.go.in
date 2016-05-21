@@ -64,6 +64,7 @@ instruction_limit = %d
 output_limit = %d
 path = [[%s]]
 cpath = [[%s]]
+%s
 `
 
 //export go_lua_inject_message
@@ -80,6 +81,21 @@ func go_lua_log(output *C.char) {
 type LuaSandbox struct {
 	hsb           *C.lsb_heka_sandbox
 	injectMessage func(payload string) int
+}
+
+func makePluginConfigString(pConf map[string]interface{}) string {
+	var confStrs []string
+	for k, v := range pConf {
+		var confStr string
+		switch u := v.(type) {
+		case string:
+			confStr = fmt.Sprintf("%s = [[%s]]", k, u)
+		default:
+			confStr = fmt.Sprintf("%s = %v", k, v)
+		}
+		confStrs = append(confStrs, confStr)
+	}
+	return strings.Join(confStrs, "\n")
 }
 
 func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sandbox, error) {
@@ -100,12 +116,15 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 		lua_cpath = append(lua_cpath, filepath.Join(p, "?@LUA_SHARED_LIBRARY_SUFFIX@"))
 	}
 
-	cfg := fmt.Sprintf(cfgTemplate,
+	cfg := fmt.Sprintf(
+		cfgTemplate,
 		conf.MemoryLimit,
 		conf.InstructionLimit,
 		conf.OutputLimit,
 		strings.Join(lua_path, ";"),
-		strings.Join(lua_cpath, ";"))
+		strings.Join(lua_cpath, ";"),
+		makePluginConfigString(conf.Config),
+	)
 	ccfg := C.CString(cfg)
 	defer C.free(unsafe.Pointer(ccfg))
 
@@ -122,20 +141,6 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 	// lsb.globals = conf.Globals
 	return lsb, nil
 }
-
-// func (this *LuaSandbox) Init(dataFile string) error {
-// 	csDataFile := C.CString(dataFile)
-// 	csPluginType := C.CString(this.sbConfig.PluginType)
-// 	defer func() {
-// 		C.free(unsafe.Pointer(csDataFile))
-// 		C.free(unsafe.Pointer(csPluginType))
-// 	}()
-// 	r := int(C.sandbox_init(this.lsb, csDataFile, csPluginType))
-// 	if r != 0 {
-// 		return fmt.Errorf("Init() %s", this.LastError())
-// 	}
-// 	return nil
-// }
 
 func (lsb *LuaSandbox) Stop() {
 	C.lsb_heka_stop_sandbox(lsb.hsb)
@@ -166,6 +171,9 @@ func (lsb *LuaSandbox) Usage(utype, ustat int) uint {
 }
 
 func (lsb *LuaSandbox) ProcessMessage(pack *pipeline.PipelinePack) int {
+	if !pack.TrustMsgBytes {
+		pack.EncodeMsgBytes()
+	}
 	r := int(C.heka_process_message(lsb.hsb, C.CString(string(pack.MsgBytes))))
 	return r
 }
