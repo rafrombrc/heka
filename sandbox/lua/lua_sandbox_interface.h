@@ -44,6 +44,6 @@ lsb_heka_sandbox* heka_create_sandbox(void *parent,
 *
 * @return int Zero on success, non-zero on failure.
 */
-int heka_process_message(lsb_heka_sandbox* hsb, const char* pb);
+int heka_process_message(lsb_heka_sandbox* hsb, const char* pb, int pblen);
 #endif
 

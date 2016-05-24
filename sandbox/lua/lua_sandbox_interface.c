@@ -133,13 +133,13 @@ size_t heka_lsb_usage(lsb_heka_sandbox* hsb, lsb_usage_type utype, lsb_usage_sta
     return hsb ? lsb_usage(hsb->lsb, utype, ustat) : 0;
 }
 
-int heka_process_message(lsb_heka_sandbox* hsb, const char* pb)
+int heka_process_message(lsb_heka_sandbox* hsb, const char* pb, int pblen)
 {
     if (!hsb) return 1;
 
     lsb_heka_message m;
     lsb_init_heka_message(&m, 2);
-    bool rv = lsb_decode_heka_message(&m, pb, strlen(pb), &logger);
+    bool rv = lsb_decode_heka_message(&m, pb, pblen, &logger);
     if (!rv) return 1;
     return lsb_heka_pm_analysis(hsb, &m, 0);
 }

@@ -174,7 +174,10 @@ func (lsb *LuaSandbox) ProcessMessage(pack *pipeline.PipelinePack) int {
 	if !pack.TrustMsgBytes {
 		pack.EncodeMsgBytes()
 	}
-	r := int(C.heka_process_message(lsb.hsb, C.CString(string(pack.MsgBytes))))
+	cMsgBytes := C.CString(string(pack.MsgBytes))
+	cpblen := C.int(len(pack.MsgBytes))
+	r := int(C.heka_process_message(lsb.hsb, cMsgBytes, cpblen))
+	C.free(unsafe.Pointer(cMsgBytes))
 	return r
 }
 
