@@ -336,14 +336,12 @@ func (s *SandboxDecoder) ReportMsg(msg *message.Message) error {
 		return fmt.Errorf("Decoder is not running")
 	}
 
-	message.NewIntField(msg, "Memory", int(s.sb.Usage(TYPE_MEMORY,
-		STAT_CURRENT)), "B")
-	message.NewIntField(msg, "MaxMemory", int(s.sb.Usage(TYPE_MEMORY,
-		STAT_MAXIMUM)), "B")
-	message.NewIntField(msg, "MaxInstructions", int(s.sb.Usage(
-		TYPE_INSTRUCTIONS, STAT_MAXIMUM)), "count")
-	message.NewIntField(msg, "MaxOutput", int(s.sb.Usage(TYPE_OUTPUT,
-		STAT_MAXIMUM)), "B")
+	stats := s.sb.Stats()
+
+	message.NewIntField(msg, "Memory", stats.MemCur, "B")
+	message.NewIntField(msg, "MaxMemory", stats.MemMax, "B")
+	message.NewIntField(msg, "MaxInstructions", stats.InstruxMax, "count")
+	message.NewIntField(msg, "MaxOutput", stats.OutputMax, "B")
 	message.NewInt64Field(msg, "ProcessMessageCount", atomic.LoadInt64(&s.processMessageCount), "count")
 	message.NewInt64Field(msg, "ProcessMessageFailures", atomic.LoadInt64(&s.processMessageFailures), "count")
 	message.NewInt64Field(msg, "ProcessMessageSamples", s.processMessageSamples, "count")

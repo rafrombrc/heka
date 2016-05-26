@@ -21,35 +21,54 @@ const (
 	STATUS_RUNNING    = 1
 	STATUS_TERMINATED = 2
 
-	STAT_LIMIT   = 0
-	STAT_CURRENT = 1
-	STAT_MAXIMUM = 2
-
-	TYPE_MEMORY       = 0
-	TYPE_INSTRUCTIONS = 1
-	TYPE_OUTPUT       = 2
-
 	DATA_DIR = "sandbox_preservation"
 	DATA_EXT = ".data"
+
+	SBX_TYPE_INPUT    = 0
+	SBX_TYPE_ANALYSIS = 1
+	SBX_TYPE_OUTPUT   = 2
 )
+
+var PluginSbxTypeMap = map[string]int{
+	"input":   SBX_TYPE_INPUT,
+	"decoder": SBX_TYPE_ANALYSIS,
+	"filter":  SBX_TYPE_ANALYSIS,
+	"encoder": SBX_TYPE_ANALYSIS,
+	"output":  SBX_TYPE_OUTPUT,
+}
+
+type SandboxStats struct {
+	MemCur             int
+	MemMax             int
+	OutputMax          int
+	InstruxMax         int
+	InputMsgCount      int64
+	InputMsgBytes      int64
+	ProcessMsgCount    int64
+	ProcessMsgFailures int64
+	ProcessMsgAvgTime  float64
+	ProcessMsgStdDev   float64
+	TimerEventAvgTime  float64
+	TimerEventStdDev   float64
+}
 
 type Sandbox interface {
 	// Sandbox control
-	// Init(dataFile string) error
 	Stop()
 	Destroy() error
 
 	// Sandbox state
 	Status() int
 	LastError() string
-	Usage(utype, ustat int) uint
+	Stats() SandboxStats
 
 	// Plugin functions
 	ProcessMessage(pack *pipeline.PipelinePack) int
 	TimerEvent(ns int64) int
 
-	// Go callback
-	InjectMessage(f func(payload string) int)
+	// Go callbacks
+	InjectMessage(injectMessage func(payload string) int)
+	UpdateCursor(updateCursor func(queueCursor string))
 }
 
 type SandboxConfig struct {

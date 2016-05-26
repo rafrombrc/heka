@@ -105,7 +105,10 @@ func (s *SandboxOutput) Run(or pipeline.OutputRunner, h pipeline.PluginHelper) (
 		ok        = true
 		ticker    = or.Ticker()
 	)
-
+	// Pass UpdateCursor function in to the sandbox for checkpoint management.
+	s.sb.UpdateCursor(or.UpdateCursor)
+	// Flag to track if we're in a batch or an async grouping.
+	inBatch := false
 	for ok {
 		select {
 		case pack, ok = <-inChan:
@@ -125,22 +128,43 @@ func (s *SandboxOutput) Run(or pipeline.OutputRunner, h pipeline.PluginHelper) (
 			}
 			s.sample = 0 == rand.Intn(s.sampleDenominator)
 
-			or.UpdateCursor(pack.QueueCursor) // TODO: support retries?
-			if retval == 0 {
+			switch {
+			case retval == 0: // Success.
+				inBatch = false
+				or.UpdateCursor(pack.QueueCursor)
 				atomic.AddInt64(&s.processMessageCount, 1)
 				pack.Recycle(nil)
-			} else if retval < 0 {
+			case retval == -2: // Skip.
+				// Only update the checkpoint if we're not in a batch.
+				if !inBatch {
+					or.UpdateCursor(pack.QueueCursor)
+				}
+				pack.Recycle(nil)
+			case retval == -3: // Retry.
+				err = pipeline.NewRetryMessageError("Retrying...")
+				pack.Recycle(err)
+			case retval == -4: // Batching.
+				inBatch = true
+				pack.Recycle(nil)
+			case retval == -5: // Async.
+				inBatch = true
+				pack.Recycle(nil)
+			case retval > 0: // Fatal error.
+				err = fmt.Errorf("FATAL: %s", s.sb.LastError())
+				pack.Recycle(err)
+				ok = false
+			default: // retval == -1 or retval < -5 => Non-fatal failure.
 				atomic.AddInt64(&s.processMessageFailures, 1)
+				// Only update the checkpoint if we're not in a batch.
+				if !inBatch {
+					or.UpdateCursor(pack.QueueCursor)
+				}
 				var e error
 				em := s.sb.LastError()
 				if len(em) > 0 {
 					e = errors.New(em)
 				}
 				pack.Recycle(e)
-			} else {
-				err = fmt.Errorf("FATAL: %s", s.sb.LastError())
-				pack.Recycle(err)
-				ok = false
 			}
 
 		case t := <-ticker:
@@ -194,12 +218,10 @@ func (s *SandboxOutput) ReportMsg(msg *message.Message) error {
 		return fmt.Errorf("Output is not running")
 	}
 
-	message.NewIntField(msg, "Memory", int(s.sb.Usage(TYPE_MEMORY,
-		STAT_CURRENT)), "B")
-	message.NewIntField(msg, "MaxMemory", int(s.sb.Usage(TYPE_MEMORY,
-		STAT_MAXIMUM)), "B")
-	message.NewIntField(msg, "MaxInstructions", int(s.sb.Usage(
-		TYPE_INSTRUCTIONS, STAT_MAXIMUM)), "count")
+	stats := s.sb.Stats()
+	message.NewIntField(msg, "Memory", stats.MemCur, "B")
+	message.NewIntField(msg, "MaxMemory", stats.MemMax, "B")
+	message.NewIntField(msg, "MaxInstructions", stats.InstruxMax, "count")
 
 	message.NewInt64Field(msg, "ProcessMessageCount", atomic.LoadInt64(&s.processMessageCount), "count")
 	message.NewInt64Field(msg, "ProcessMessageFailures", atomic.LoadInt64(&s.processMessageFailures), "count")

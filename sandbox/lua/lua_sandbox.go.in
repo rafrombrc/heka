@@ -55,9 +55,21 @@ func go_lua_log(output *C.char) {
 	log.Println(C.GoString(output))
 }
 
+//export go_lua_output_update_checkpoint
+func go_lua_output_update_checkpoint(sbPtr unsafe.Pointer, seqIdPtr unsafe.Pointer) int {
+	// We should be holding a LuaSandbox and a queue cursor string.
+	var lsb *LuaSandbox = (*LuaSandbox)(sbPtr)
+	var cQueueCursor *C.char = (*C.char)(seqIdPtr)
+	queueCursor := C.GoString(cQueueCursor)
+	lsb.updateCursor(queueCursor)
+	return 0
+}
+
 type LuaSandbox struct {
 	hsb           *C.lsb_heka_sandbox
+	sbxType       int
 	injectMessage func(payload string) int
+	updateCursor  func(queueCursor string)
 }
 
 func makePluginConfigString(pConf map[string]interface{}) string {
@@ -76,10 +88,15 @@ func makePluginConfigString(pConf map[string]interface{}) string {
 }
 
 func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sandbox, error) {
+	sbxType, ok := sandbox.PluginSbxTypeMap[conf.PluginType]
+	if !ok {
+		return nil, fmt.Errorf("Unknown plugin type: %s", conf.PluginType)
+	}
 	var (
 		lua_path, lua_cpath []string
 	)
 	lsb := new(LuaSandbox)
+	lsb.sbxType = sbxType
 	cs := C.CString(conf.ScriptFilename)
 	cstateFile := C.CString(stateFile)
 	defer func() {
@@ -105,7 +122,7 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 	ccfg := C.CString(cfg)
 	defer C.free(unsafe.Pointer(ccfg))
 
-	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), cs, cstateFile, ccfg)
+	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), C.int(sbxType), cs, cstateFile, ccfg)
 
 	if lsb.hsb == nil {
 		return nil, fmt.Errorf("Sandbox creation failed")
@@ -114,8 +131,6 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 		log.Printf("payload: %s\n", p)
 		return 0
 	}
-	// lsb.config = conf.Config
-	// lsb.globals = conf.Globals
 	return lsb, nil
 }
 
@@ -135,16 +150,33 @@ func (lsb *LuaSandbox) Destroy() error {
 }
 
 func (lsb *LuaSandbox) Status() int {
-	return int(C.heka_lsb_get_state(lsb.hsb))
+	is_running := bool(C.lsb_heka_is_running(lsb.hsb))
+	if is_running {
+		return sandbox.STATUS_RUNNING
+	}
+	return sandbox.STATUS_TERMINATED
 }
 
 func (lsb *LuaSandbox) LastError() string {
-	return C.GoString(C.heka_lsb_get_error(lsb.hsb))
+	return C.GoString(C.lsb_heka_get_error(lsb.hsb))
 }
 
-func (lsb *LuaSandbox) Usage(utype, ustat int) uint {
-	return uint(C.heka_lsb_usage(lsb.hsb, C.lsb_usage_type(utype),
-		C.lsb_usage_stat(ustat)))
+func (lsb *LuaSandbox) Stats() sandbox.SandboxStats {
+	cStats := C.lsb_heka_get_stats(lsb.hsb)
+	return sandbox.SandboxStats{
+		MemCur:             int(cStats.mem_cur),
+		MemMax:             int(cStats.mem_max),
+		OutputMax:          int(cStats.out_max),
+		InstruxMax:         int(cStats.ins_max),
+		InputMsgCount:      int64(cStats.im_cnt),
+		InputMsgBytes:      int64(cStats.im_bytes),
+		ProcessMsgCount:    int64(cStats.pm_cnt),
+		ProcessMsgFailures: int64(cStats.pm_failures),
+		ProcessMsgAvgTime:  float64(cStats.pm_avg),
+		ProcessMsgStdDev:   float64(cStats.pm_sd),
+		TimerEventAvgTime:  float64(cStats.te_avg),
+		TimerEventStdDev:   float64(cStats.te_sd),
+	}
 }
 
 func (lsb *LuaSandbox) ProcessMessage(pack *pipeline.PipelinePack) int {
@@ -153,7 +185,15 @@ func (lsb *LuaSandbox) ProcessMessage(pack *pipeline.PipelinePack) int {
 	}
 	cMsgBytes := C.CString(string(pack.MsgBytes))
 	cpblen := C.int(len(pack.MsgBytes))
-	r := int(C.heka_process_message(lsb.hsb, cMsgBytes, cpblen))
+	var r int
+	switch lsb.sbxType {
+	case sandbox.SBX_TYPE_ANALYSIS:
+		r = int(C.heka_analysis_process_message(lsb.hsb, cMsgBytes, cpblen))
+	case sandbox.SBX_TYPE_OUTPUT:
+		cQueueCursor := C.CString(pack.QueueCursor)
+		r = int(C.heka_output_process_message(lsb.hsb, cMsgBytes, cpblen, cQueueCursor))
+		C.free(unsafe.Pointer(cQueueCursor))
+	}
 	C.free(unsafe.Pointer(cMsgBytes))
 	return r
 }
@@ -162,6 +202,10 @@ func (lsb *LuaSandbox) TimerEvent(ns int64) int {
 	return int(C.lsb_heka_timer_event(lsb.hsb, C.time_t(ns), C.bool(false)))
 }
 
-func (lsb *LuaSandbox) InjectMessage(f func(payload string) int) {
-	lsb.injectMessage = f
+func (lsb *LuaSandbox) InjectMessage(injectMessage func(payload string) int) {
+	lsb.injectMessage = injectMessage
+}
+
+func (lsb *LuaSandbox) UpdateCursor(updateCursor func(queueCursor string)) {
+	lsb.updateCursor = updateCursor
 }

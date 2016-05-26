@@ -126,14 +126,11 @@ func (this *SandboxFilter) ReportMsg(msg *message.Message) error {
 		return nil
 	}
 
-	message.NewIntField(msg, "Memory", int(this.sb.Usage(TYPE_MEMORY,
-		STAT_CURRENT)), "B")
-	message.NewIntField(msg, "MaxMemory", int(this.sb.Usage(TYPE_MEMORY,
-		STAT_MAXIMUM)), "B")
-	message.NewIntField(msg, "MaxInstructions", int(this.sb.Usage(
-		TYPE_INSTRUCTIONS, STAT_MAXIMUM)), "count")
-	message.NewIntField(msg, "MaxOutput", int(this.sb.Usage(TYPE_OUTPUT,
-		STAT_MAXIMUM)), "B")
+	stats := this.sb.Stats()
+	message.NewIntField(msg, "Memory", stats.MemCur, "B")
+	message.NewIntField(msg, "MaxMemory", stats.MemMax, "B")
+	message.NewIntField(msg, "MaxInstructions", stats.InstruxMax, "count")
+	message.NewIntField(msg, "MaxOutput", stats.OutputMax, "B")
 	message.NewInt64Field(msg, "ProcessMessageCount", atomic.LoadInt64(&this.processMessageCount), "count")
 	message.NewInt64Field(msg, "ProcessMessageFailures", atomic.LoadInt64(&this.processMessageFailures), "count")
 	message.NewInt64Field(msg, "InjectMessageCount", atomic.LoadInt64(&this.injectMessageCount), "count")
