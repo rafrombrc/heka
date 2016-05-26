@@ -35,29 +35,6 @@ import (
 	"github.com/mozilla-services/heka/sandbox"
 )
 
-const SandboxIoTemplate = `{
-memory_limit = %d,
-instruction_limit = %d,
-output_limit = %d,
-path = [[%s]],
-cpath = [[%s]],
-remove_entries = {
-[''] = { 'dofile', 'load', 'loadfile','loadstring', 'print'},
-os = {'exit', 'setlocale'}}}`
-
-const SandboxTemplate = `{
-memory_limit = %d,
-instruction_limit = %d,
-output_limit = %d,
-path = [[%s]],
-cpath = [[%s]],
-remove_entries = {
-[''] = {'collectgarbage','coroutine','dofile','load','loadfile','loadstring','newproxy','print'},
-os = {'getenv','execute','exit','remove','rename','setlocale','tmpname'}
-},
-disable_modules = {io = 1}
-}`
-
 const cfgTemplate = `
 memory_limit = %d
 instruction_limit = %d
