@@ -122,14 +122,14 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 	ccfg := C.CString(cfg)
 	defer C.free(unsafe.Pointer(ccfg))
 
-	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), C.int(sbxType), cs, cstateFile, ccfg)
-
-	if lsb.hsb == nil {
-		return nil, fmt.Errorf("Sandbox creation failed")
-	}
 	lsb.injectMessage = func(p string) int {
 		log.Printf("payload: %s\n", p)
 		return 0
+	}
+
+	lsb.hsb = C.heka_create_sandbox(unsafe.Pointer(lsb), C.int(sbxType), cs, cstateFile, ccfg)
+	if lsb.hsb == nil {
+		return nil, fmt.Errorf("Sandbox creation failed")
 	}
 	return lsb, nil
 }
