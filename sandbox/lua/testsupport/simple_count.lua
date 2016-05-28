@@ -5,11 +5,9 @@
 count = 0
 
 function process_message ()
-    count = count + 1
     inject_payload("txt", "", count)
     return 0
 end
 
 function timer_event(ns)
 end
-

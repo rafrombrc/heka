@@ -3,5 +3,6 @@
 -- file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
 function process_message()
-    inject_payload("txt", "", "Hello World!")
+    inject_payload("txt", "", "Hello world!")
+    return 0
 end

@@ -50,8 +50,8 @@ func TestCreation(t *testing.T) {
 		t.Errorf("maximum memory should be >0, using %d", b)
 	}
 	b = stats.InstruxMax
-	if b != 0 {
-		t.Errorf("maximum instructions should be 0, using %d", b)
+	if b != 3 {
+		t.Errorf("maximum instructions should be 3, using %d", b)
 	}
 	b = stats.OutputMax
 	if b != 0 {
@@ -199,8 +199,8 @@ func TestProcessMessage(t *testing.T) {
 		t.Errorf("maximum memory should be >0, using %d", b)
 	}
 	b = stats.InstruxMax
-	if b != 6 {
-		t.Errorf("maximum instructions should be 6, using %d", b)
+	if b != 7 {
+		t.Errorf("maximum instructions should be 7, using %d", b)
 	}
 	b = stats.OutputMax
 	if b != 12 {
@@ -364,8 +364,8 @@ func TestRestore(t *testing.T) {
 		if err != nil {
 			t.Errorf("%s", err)
 		}
-		if msg.GetPayload() != "11" {
-			t.Errorf("State was not restored")
+		if msg.GetPayload() != "10" {
+			t.Errorf("State was not restored, expected 10, got %s", msg.GetPayload())
 		}
 		return 0
 	})
@@ -605,8 +605,8 @@ func TestInjectMessageError(t *testing.T) {
 		"process_message() ./testsupport/inject_message.lua:44: strbuf output_limit exceeded",
 		"process_message() ./testsupport/inject_message.lua:50: inject_message() failed: array has mixed types",
 		"process_message() ./testsupport/inject_message.lua:53: inject_message() failed: unsupported type: nil",
-		"process_message() ./testsupport/inject_message.lua:55: bad argument #1 to 'inject_payload' (string expected, got nil)",
-		"process_message() ./testsupport/inject_message.lua:57: bad argument #2 to 'inject_payload' (string expected, got nil)",
+		"process_message() ./testsupport/inject_message.lua:55: inject_payload() payload_type argument must be a string",
+		"process_message() ./testsupport/inject_message.lua:57: inject_payload() payload_name argument must be a string",
 		"process_message() ./testsupport/inject_message.lua:59: bad argument #1 to 'inject_message' (table expected, got nil)",
 		"process_message() ./testsupport/inject_message.lua:62: output_limit exceeded",
 	}
