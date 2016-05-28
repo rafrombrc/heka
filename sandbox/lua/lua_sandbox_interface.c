@@ -28,7 +28,7 @@ static int input_inject_message(void *parent, const char *pb, size_t pb_len,
     return go_lua_inject_message(parent, (char*)pb, pb_len);
 }
 
-static int inject_message(void *parent, const char *pb, size_t pb_len)
+static int analysis_inject_message(void *parent, const char *pb, size_t pb_len)
 {
     return go_lua_inject_message(parent, (char*)pb, pb_len);
 }
@@ -106,7 +106,7 @@ lsb_heka_sandbox* heka_create_sandbox(void *parent,
         break;
     case SBX_TYPE_ANALYSIS:
         sbx = lsb_heka_create_analysis(parent, lua_file, state_file, lsb_cfg, &logger,
-                                       inject_message);
+                                       analysis_inject_message);
         break;
     case SBX_TYPE_OUTPUT:
         sbx = lsb_heka_create_output(parent, lua_file, state_file, lsb_cfg, &logger,
