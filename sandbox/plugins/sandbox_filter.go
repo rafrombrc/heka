@@ -206,7 +206,13 @@ func (this *SandboxFilter) Run(fr pipeline.FilterRunner, h pipeline.PluginHelper
 		err := proto.Unmarshal([]byte(payload), pack.Message)
 		if err == nil {
 			// do not allow filters to override the following
-			pack.Message.SetType("heka.sandbox." + pack.Message.GetType())
+			type_ := pack.Message.GetType()
+			if len(type_) == 0 || type_ == "inject_payload" {
+				type_ = "heka.sandbox-output"
+			} else {
+				type_ = "heka.sandbox." + type_
+			}
+			pack.Message.SetType(type_)
 			pack.Message.SetLogger(fr.Name())
 			pack.Message.SetHostname(hostname)
 		} else {
