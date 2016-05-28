@@ -101,6 +101,8 @@ lsb_heka_sandbox* heka_create_sandbox(void *parent,
     lsb_heka_sandbox *sbx;
     switch (sbx_type) {
     case SBX_TYPE_INPUT:
+        sbx = lsb_heka_create_input(parent, lua_file, state_file, lsb_cfg, &logger,
+                                    input_inject_message);
         break;
     case SBX_TYPE_ANALYSIS:
         sbx = lsb_heka_create_analysis(parent, lua_file, state_file, lsb_cfg, &logger,

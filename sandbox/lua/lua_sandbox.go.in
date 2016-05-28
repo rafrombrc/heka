@@ -196,6 +196,14 @@ func (lsb *LuaSandbox) Stats() sandbox.SandboxStats {
 }
 
 func (lsb *LuaSandbox) ProcessMessage(pack *pipeline.PipelinePack) int {
+	// pack should be nil IFF we're a SandboxInput.
+	if pack == nil {
+		if lsb.sbxType != sandbox.SBX_TYPE_INPUT {
+			return -1
+		}
+		return int(C.lsb_heka_pm_input(lsb.hsb, 0, nil, false))
+	}
+
 	if !pack.TrustMsgBytes {
 		pack.EncodeMsgBytes()
 	}
