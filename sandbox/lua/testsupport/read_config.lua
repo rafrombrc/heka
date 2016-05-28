@@ -18,7 +18,7 @@ local n = read_config("nil")
 if n ~= nil then error("nil") end
 
 local a = read_config("array")
-if a ~= nil then error("array") end
+if #a ~= 3 or a[1] ~= 1 or a[2] ~= 2 or a[3] ~= 3 then error("array") end
 
 local o = read_config("object")
 if o ~= nil then return error("object") end
