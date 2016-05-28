@@ -79,10 +79,26 @@ func makePluginConfigString(pConf map[string]interface{}) string {
 		switch u := v.(type) {
 		case string:
 			confStr = fmt.Sprintf("%s = [[%s]]", k, u)
-		default:
+		case []string:
+			quoted := []string{}
+			for _, s := range u {
+				quoted = append(quoted, fmt.Sprintf("[[%s]]", s))
+			}
+			v = strings.Join(quoted, ", ")
+			confStr = fmt.Sprintf("%s = {%v}", k, v)
+		case []int, []int64, []float64, []bool:
+			stringed := fmt.Sprintf("%v", v)
+			stringed = stringed[1 : len(stringed)-1]
+			stringed = strings.Replace(stringed, " ", ", ", -1)
+			confStr = fmt.Sprintf("%s = {%s}", k, stringed)
+		case int, int64, float64, bool:
 			confStr = fmt.Sprintf("%s = %v", k, v)
+		default:
+			confStr = ""
 		}
-		confStrs = append(confStrs, confStr)
+		if confStr != "" {
+			confStrs = append(confStrs, confStr)
+		}
 	}
 	return strings.Join(confStrs, "\n")
 }
