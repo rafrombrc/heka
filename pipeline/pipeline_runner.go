@@ -29,6 +29,7 @@ import (
 
 	"github.com/gogo/protobuf/proto"
 	"github.com/mozilla-services/heka/message"
+	"github.com/pborman/uuid"
 	notify "github.com/rafrombrc/go-notify"
 )
 
@@ -189,6 +190,8 @@ func NewPipelinePack(recycleChan chan *PipelinePack) (pack *PipelinePack) {
 	msgBytes := make([]byte, 0, message.MAX_MESSAGE_SIZE)
 	message := &message.Message{}
 	message.SetSeverity(7)
+	message.SetUuid(uuid.NewRandom())
+	message.SetTimestamp(time.Now().UTC().UnixNano())
 
 	return &PipelinePack{
 		MsgBytes:      msgBytes,
@@ -215,7 +218,10 @@ func (p *PipelinePack) Zero() {
 
 	// TODO: Possibly zero the message instead depending on benchmark
 	// results of re-allocating a new message
-	p.Message = new(message.Message)
+	message := &message.Message{}
+	message.SetSeverity(7)
+	message.SetUuid(uuid.NewRandom())
+	message.SetTimestamp(time.Now().UTC().UnixNano())
 }
 
 func (p *PipelinePack) recycle() {

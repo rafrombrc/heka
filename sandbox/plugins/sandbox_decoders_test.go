@@ -72,7 +72,8 @@ func DecoderSpec(c gs.Context) {
 				pack.Message.SetPayload(data)
 				packs, err := decoder.Decode(pack)
 				c.Expect(len(packs), gs.Equals, 0)
-				c.Expect(err.Error(), gs.Equals, "Failed parsing: LPeg grammar failed to match payload: "+data)
+				c.Expect(err.Error(), gs.Equals,
+					"Failed parsing: LPeg grammar failed to match payload: "+data)
 				c.Expect(decoder.processMessageFailures, gs.Equals, int64(1))
 				decoder.Shutdown()
 			})
@@ -105,157 +106,157 @@ func DecoderSpec(c gs.Context) {
 			})
 		})
 
-		c.Specify("that only uses write_message", func() {
-			conf.ScriptFilename = "../lua/testsupport/write_message_decoder.lua"
-			conf.ModuleDirectory = "../lua/modules"
-			dRunner.EXPECT().Name().Return("write_message")
-			err := decoder.Init(conf)
-			decoder.SetDecoderRunner(dRunner)
-			c.Assume(err, gs.IsNil)
+		// 	c.Specify("that only uses write_message", func() {
+		// 		conf.ScriptFilename = "../lua/testsupport/write_message_decoder.lua"
+		// 		conf.ModuleDirectory = "../lua/modules"
+		// 		dRunner.EXPECT().Name().Return("write_message")
+		// 		err := decoder.Init(conf)
+		// 		decoder.SetDecoderRunner(dRunner)
+		// 		c.Assume(err, gs.IsNil)
 
-			c.Specify("adds a string field to the message", func() {
-				data := "string field scribble"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				value, ok := pack.Message.GetFieldValue("scribble")
-				c.Expect(ok, gs.IsTrue)
-				c.Expect(value.(string), gs.Equals, "foo")
-			})
+		// 		c.Specify("adds a string field to the message", func() {
+		// 			data := "string field scribble"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			value, ok := pack.Message.GetFieldValue("scribble")
+		// 			c.Expect(ok, gs.IsTrue)
+		// 			c.Expect(value.(string), gs.Equals, "foo")
+		// 		})
 
-			c.Specify("adds a numeric field to the message", func() {
-				data := "num field scribble"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				value, ok := pack.Message.GetFieldValue("scribble")
-				c.Expect(ok, gs.IsTrue)
-				c.Expect(value.(float64), gs.Equals, float64(1))
-			})
+		// 		c.Specify("adds a numeric field to the message", func() {
+		// 			data := "num field scribble"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			value, ok := pack.Message.GetFieldValue("scribble")
+		// 			c.Expect(ok, gs.IsTrue)
+		// 			c.Expect(value.(float64), gs.Equals, float64(1))
+		// 		})
 
-			c.Specify("adds a boolean field to the message", func() {
-				data := "bool field scribble"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				value, ok := pack.Message.GetFieldValue("scribble")
-				c.Expect(ok, gs.IsTrue)
-				c.Expect(value.(bool), gs.Equals, true)
-			})
+		// 		c.Specify("adds a boolean field to the message", func() {
+		// 			data := "bool field scribble"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			value, ok := pack.Message.GetFieldValue("scribble")
+		// 			c.Expect(ok, gs.IsTrue)
+		// 			c.Expect(value.(bool), gs.Equals, true)
+		// 		})
 
-			c.Specify("sets type and payload", func() {
-				data := "set type and payload"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				c.Expect(pack.Message.GetType(), gs.Equals, "my_type")
-				c.Expect(pack.Message.GetPayload(), gs.Equals, "my_payload")
-			})
+		// 		c.Specify("sets type and payload", func() {
+		// 			data := "set type and payload"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			c.Expect(pack.Message.GetType(), gs.Equals, "my_type")
+		// 			c.Expect(pack.Message.GetPayload(), gs.Equals, "my_payload")
+		// 		})
 
-			c.Specify("sets field value with representation", func() {
-				data := "set field value with representation"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				fields := pack.Message.FindAllFields("rep")
-				c.Expect(len(fields), gs.Equals, 1)
-				field := fields[0]
-				values := field.GetValueString()
-				c.Expect(len(values), gs.Equals, 1)
-				c.Expect(values[0], gs.Equals, "foo")
-				c.Expect(field.GetRepresentation(), gs.Equals, "representation")
-			})
+		// 		c.Specify("sets field value with representation", func() {
+		// 			data := "set field value with representation"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			fields := pack.Message.FindAllFields("rep")
+		// 			c.Expect(len(fields), gs.Equals, 1)
+		// 			field := fields[0]
+		// 			values := field.GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 1)
+		// 			c.Expect(values[0], gs.Equals, "foo")
+		// 			c.Expect(field.GetRepresentation(), gs.Equals, "representation")
+		// 		})
 
-			c.Specify("sets multiple field string values", func() {
-				data := "set multiple field string values"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				fields := pack.Message.FindAllFields("multi")
-				c.Expect(len(fields), gs.Equals, 2)
-				values := fields[0].GetValueString()
-				c.Expect(len(values), gs.Equals, 1)
-				c.Expect(values[0], gs.Equals, "first")
-				values = fields[1].GetValueString()
-				c.Expect(len(values), gs.Equals, 1)
-				c.Expect(values[0], gs.Equals, "second")
-			})
+		// 		c.Specify("sets multiple field string values", func() {
+		// 			data := "set multiple field string values"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			fields := pack.Message.FindAllFields("multi")
+		// 			c.Expect(len(fields), gs.Equals, 2)
+		// 			values := fields[0].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 1)
+		// 			c.Expect(values[0], gs.Equals, "first")
+		// 			values = fields[1].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 1)
+		// 			c.Expect(values[0], gs.Equals, "second")
+		// 		})
 
-			c.Specify("sets field string array value", func() {
-				data := "set field string array value"
-				pack.Message.SetPayload(data)
-				packs, err := decoder.Decode(pack)
-				c.Expect(err, gs.IsNil)
-				c.Expect(len(packs), gs.Equals, 1)
-				c.Expect(packs[0], gs.Equals, pack)
-				fields := pack.Message.FindAllFields("array")
-				c.Expect(len(fields), gs.Equals, 1)
-				values := fields[0].GetValueString()
-				c.Expect(len(values), gs.Equals, 2)
-				c.Expect(values[0], gs.Equals, "first")
-				c.Expect(values[1], gs.Equals, "second")
-			})
+		// 		c.Specify("sets field string array value", func() {
+		// 			data := "set field string array value"
+		// 			pack.Message.SetPayload(data)
+		// 			packs, err := decoder.Decode(pack)
+		// 			c.Expect(err, gs.IsNil)
+		// 			c.Expect(len(packs), gs.Equals, 1)
+		// 			c.Expect(packs[0], gs.Equals, pack)
+		// 			fields := pack.Message.FindAllFields("array")
+		// 			c.Expect(len(fields), gs.Equals, 1)
+		// 			values := fields[0].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 2)
+		// 			c.Expect(values[0], gs.Equals, "first")
+		// 			c.Expect(values[1], gs.Equals, "second")
+		// 		})
 
-			c.Specify("deletes a field from message", func() {
-				data := "delete field scribble"
-				pack.Message.SetPayload(data)
-				f, _ := message.NewField("scribble", "asdf", "")
-				pack.Message.AddField(f)
-				decoder.Decode(pack)
-				fields := pack.Message.FindAllFields("scribble")
-				c.Expect(len(fields), gs.Equals, 0)
-				_, ok := pack.Message.GetFieldValue("scribble")
-				c.Expect(ok, gs.IsFalse)
-			})
+		// 		c.Specify("deletes a field from message", func() {
+		// 			data := "delete field scribble"
+		// 			pack.Message.SetPayload(data)
+		// 			f, _ := message.NewField("scribble", "asdf", "")
+		// 			pack.Message.AddField(f)
+		// 			decoder.Decode(pack)
+		// 			fields := pack.Message.FindAllFields("scribble")
+		// 			c.Expect(len(fields), gs.Equals, 0)
+		// 			_, ok := pack.Message.GetFieldValue("scribble")
+		// 			c.Expect(ok, gs.IsFalse)
+		// 		})
 
-			c.Specify("deletes one of multiple field values", func() {
-				data := "delete second field of multi"
-				pack.Message.SetPayload(data)
-				f1, _ := message.NewField("multi", "first", "")
-				f2, _ := message.NewField("multi", "second", "")
-				f3, _ := message.NewField("multi", "third", "")
-				pack.Message.AddField(f1)
-				pack.Message.AddField(f2)
-				pack.Message.AddField(f3)
-				decoder.Decode(pack)
-				fields := pack.Message.FindAllFields("multi")
-				c.Expect(len(fields), gs.Equals, 2)
-				values := fields[0].GetValueString()
-				c.Expect(len(values), gs.Equals, 1)
-				c.Expect(values[0], gs.Equals, "first")
-				values = fields[1].GetValueString()
-				c.Expect(len(values), gs.Equals, 1)
-				c.Expect(values[0], gs.Equals, "third")
-				_, ok := pack.Message.GetFieldValue("multi")
-				c.Expect(ok, gs.IsTrue)
-			})
+		// 		c.Specify("deletes one of multiple field values", func() {
+		// 			data := "delete second field of multi"
+		// 			pack.Message.SetPayload(data)
+		// 			f1, _ := message.NewField("multi", "first", "")
+		// 			f2, _ := message.NewField("multi", "second", "")
+		// 			f3, _ := message.NewField("multi", "third", "")
+		// 			pack.Message.AddField(f1)
+		// 			pack.Message.AddField(f2)
+		// 			pack.Message.AddField(f3)
+		// 			decoder.Decode(pack)
+		// 			fields := pack.Message.FindAllFields("multi")
+		// 			c.Expect(len(fields), gs.Equals, 2)
+		// 			values := fields[0].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 1)
+		// 			c.Expect(values[0], gs.Equals, "first")
+		// 			values = fields[1].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 1)
+		// 			c.Expect(values[0], gs.Equals, "third")
+		// 			_, ok := pack.Message.GetFieldValue("multi")
+		// 			c.Expect(ok, gs.IsTrue)
+		// 		})
 
-			c.Specify("deletes one of multiple array values", func() {
-				data := "delete second value of array"
-				pack.Message.SetPayload(data)
-				decoder.Decode(pack)
-				fields := pack.Message.FindAllFields("array")
-				c.Expect(len(fields), gs.Equals, 1)
-				values := fields[0].GetValueString()
-				c.Expect(len(values), gs.Equals, 2)
-				c.Expect(values[0], gs.Equals, "first")
-				c.Expect(values[1], gs.Equals, "third")
-				_, ok := pack.Message.GetFieldValue("array")
-				c.Expect(ok, gs.IsTrue)
-			})
-		})
+		// 		c.Specify("deletes one of multiple array values", func() {
+		// 			data := "delete second value of array"
+		// 			pack.Message.SetPayload(data)
+		// 			decoder.Decode(pack)
+		// 			fields := pack.Message.FindAllFields("array")
+		// 			c.Expect(len(fields), gs.Equals, 1)
+		// 			values := fields[0].GetValueString()
+		// 			c.Expect(len(values), gs.Equals, 2)
+		// 			c.Expect(values[0], gs.Equals, "first")
+		// 			c.Expect(values[1], gs.Equals, "third")
+		// 			_, ok := pack.Message.GetFieldValue("array")
+		// 			c.Expect(ok, gs.IsTrue)
+		// 		})
+		// 	})
 	})
 
 	c.Specify("A Multipack SandboxDecoder", func() {

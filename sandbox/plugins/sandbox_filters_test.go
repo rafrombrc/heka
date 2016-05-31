@@ -512,6 +512,8 @@ func FilterSpec(c gs.Context) {
 		fth.MockFilterRunner.EXPECT().Inject(pack).Do(func(pack *pipeline.PipelinePack) {
 			msg := pack.Message
 			pack.Message = new(message.Message)
+			pack.Message.SetTimestamp(time.Now().UnixNano())
+			pack.Message.SetUuid(uuid.NewRandom())
 			retMsgChan <- msg
 		}).Return(true).AnyTimes()
 
@@ -598,6 +600,7 @@ func FilterSpec(c gs.Context) {
 		field, _ := message.NewField("status_code", 0, "")
 		msg := &message.Message{}
 		msg.SetTimestamp(0)
+		msg.SetUuid(uuid.NewRandom())
 		msg.AddField(field)
 
 		pack := pipeline.NewPipelinePack(recycleChan)

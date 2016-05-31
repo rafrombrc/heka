@@ -153,7 +153,7 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 	switch s.sbc.ScriptType {
 	case "lua":
 		stateFile := ""
-		if s.sbc.PreserveData && fileExists(s.preservationFile) {
+		if s.sbc.PreserveData {
 			stateFile = s.preservationFile
 		}
 		s.sb, err = lua.CreateLuaSandbox(s.sbc, stateFile)
