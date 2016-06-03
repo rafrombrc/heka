@@ -51,6 +51,7 @@ type SandboxDecoder struct {
 	tz                     *time.Location
 	sampleDenominator      int
 	pConfig                *pipeline.PipelineConfig
+	debug                  bool
 }
 
 func (s *SandboxDecoder) ConfigStruct() interface{} {
@@ -138,6 +139,61 @@ func copyMessageHeaders(dst *message.Message, src *message.Message) {
 	}
 }
 
+func copyPayloadFields(dst *message.Message, src *message.Message) error {
+	dst.SetPayload(src.GetPayload())
+	fPayloadTypeSrc := src.FindFirstField("payload_type")
+	payloadTypes := fPayloadTypeSrc.GetValueString()
+	if len(payloadTypes) > 0 {
+		fPayloadType, err := message.NewField("payload_type", payloadTypes[0], "")
+		if err != nil {
+			return err
+		}
+		dst.AddField(fPayloadType)
+	}
+	fPayloadNameSrc := src.FindFirstField("payload_name")
+	payloadNames := fPayloadNameSrc.GetValueString()
+	if len(payloadNames) > 0 {
+		fPayloadName, err := message.NewField("payload_name", payloadNames[0], "")
+		if err != nil {
+			return err
+		}
+		dst.AddField(fPayloadName)
+	}
+	return nil
+}
+
+func populateMissingHeaders(newMsg *message.Message, original *message.Message) (changed bool) {
+	if newMsg.Uuid == nil {
+		newMsg.SetUuid(uuid.NewRandom()) // UUID should always be unique
+		changed = true
+	}
+	if newMsg.Timestamp == nil {
+		newMsg.SetTimestamp(original.GetTimestamp())
+		changed = true
+	}
+	if newMsg.Type == nil || *newMsg.Type == "inject_payload" {
+		newMsg.SetType(original.GetType())
+		changed = true
+	}
+	if newMsg.Hostname == nil {
+		newMsg.SetHostname(original.GetHostname())
+		changed = true
+	}
+	if newMsg.Logger == nil {
+		newMsg.SetLogger(original.GetLogger())
+		changed = true
+	}
+	if newMsg.Severity == nil {
+		newMsg.SetSeverity(original.GetSeverity())
+		changed = true
+	}
+	if newMsg.Pid == nil {
+		newMsg.SetPid(original.GetPid())
+		changed = true
+	}
+	return changed
+}
+
 func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 	if s.sb != nil {
 		return // no-op already initialized
@@ -172,76 +228,68 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 	}
 
 	s.sb.InjectMessage(func(payload string) int {
+		first := false
+		// s.pack == nil implies this is not the first message injection
+		// triggered by the current input message.
 		if s.pack == nil {
 			s.pack = dr.NewPack()
 			if s.pack == nil {
 				return 5 // We're aborting, exit out.
 			}
-			if original == nil && len(s.packs) > 0 {
-				original = s.packs[0].Message // payload injections have the original header data in the first pack
-			}
 		} else {
-			original = nil // processing a new message, clear the old message
+			first = true
+			// Save off the header values in case they get wiped out.
+			original = new(message.Message)
+			copyMessageHeaders(original, s.pack.Message)
 		}
 
-		// write protobuf encoding to MsgBytes
+		// Write returned protobuf data to MsgBytes and decode.
 		needed := len(payload)
 		if cap(s.pack.MsgBytes) < needed {
-			s.pack.MsgBytes = make([]byte, len(payload))
+			s.pack.MsgBytes = []byte(payload)
 		} else {
 			s.pack.MsgBytes = s.pack.MsgBytes[:len(payload)]
+			copy(s.pack.MsgBytes, payload)
 		}
-		copy(s.pack.MsgBytes, payload)
-		s.pack.TrustMsgBytes = true
-
-		if original == nil {
-			original = new(message.Message)
-			copyMessageHeaders(original, s.pack.Message) // save off the header values since unmarshal will wipe them out
-		}
-		if nil != proto.Unmarshal(s.pack.MsgBytes, s.pack.Message) {
+		fromSbxMsg := new(message.Message)
+		if proto.Unmarshal(s.pack.MsgBytes, fromSbxMsg) != nil {
 			return 1
 		}
+
+		// No payload_type field implies inject_message was used.
+		if fromSbxMsg.FindFirstField("payload_type") == nil {
+			s.pack.Message = fromSbxMsg
+			// If injections fail to set the standard headers, use the values
+			// from the original message.
+			s.pack.TrustMsgBytes = !populateMissingHeaders(s.pack.Message, original)
+			s.packs = append(s.packs, s.pack)
+			s.pack = nil
+			return 0
+		}
+
+		// If we got this far then inject_payload was used.
+		s.pack.TrustMsgBytes = false
+		if first {
+			// Copy payload, payload_type, and payload_name values back to
+			// the input message.
+			err := copyPayloadFields(s.pack.Message, fromSbxMsg)
+			if err != nil {
+				return 1
+			}
+		} else {
+			// Populate message headers from the original input message.
+			populateMissingHeaders(fromSbxMsg, original)
+			s.pack.Message = fromSbxMsg
+		}
+
 		if s.tz != time.UTC {
 			const layout = "2006-01-02T15:04:05.999999999" // remove the incorrect UTC tz info
 			t := time.Unix(0, s.pack.Message.GetTimestamp())
 			t = t.In(time.UTC)
 			ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
 			s.pack.Message.SetTimestamp(ct.UnixNano())
-			s.pack.TrustMsgBytes = false
 		}
 
-		if original != nil {
-			// if future injections fail to set the standard headers, use the values
-			// from the original message.
-			if s.pack.Message.Uuid == nil {
-				s.pack.Message.SetUuid(uuid.NewRandom()) // UUID should always be unique
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Timestamp == nil {
-				s.pack.Message.SetTimestamp(original.GetTimestamp())
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Type == nil {
-				s.pack.Message.SetType(original.GetType())
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Hostname == nil {
-				s.pack.Message.SetHostname(original.GetHostname())
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Logger == nil {
-				s.pack.Message.SetLogger(original.GetLogger())
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Severity == nil {
-				s.pack.Message.SetSeverity(original.GetSeverity())
-				s.pack.TrustMsgBytes = false
-			}
-			if s.pack.Message.Pid == nil {
-				s.pack.Message.SetPid(original.GetPid())
-				s.pack.TrustMsgBytes = false
-			}
-		}
 		s.packs = append(s.packs, s.pack)
 		s.pack = nil
 		return 0

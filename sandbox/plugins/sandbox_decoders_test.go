@@ -288,19 +288,28 @@ func DecoderSpec(c gs.Context) {
 			c.Expect(packs[1].Message.GetPayload(), gs.Equals, "message two")
 			c.Expect(packs[2].Message.GetPayload(), gs.Equals, "message three")
 
-			for i := 0; i < 1; i++ {
-				c.Expect(packs[i].Message.GetType(), gs.Equals, "TEST")
-				c.Expect(packs[i].Message.GetHostname(), gs.Equals, "my.host.name")
-				c.Expect(packs[i].Message.GetLogger(), gs.Equals, "GoSpec")
-				c.Expect(packs[i].Message.GetSeverity(), gs.Equals, int32(6))
+			c.Expect(packs[0].Message.GetType(), gs.Equals, "TEST")
+			c.Expect(packs[0].Message.GetHostname(), gs.Equals, "my.host.name")
+			c.Expect(packs[0].Message.GetLogger(), gs.Equals, "GoSpec")
+			c.Expect(packs[0].Message.GetSeverity(), gs.Equals, int32(6))
 
-			}
+			c.Expect(packs[1].Message.GetType(), gs.Equals, "TEST")
+			c.Expect(packs[1].Message.GetHostname(), gs.Equals, "my.host.name")
+			c.Expect(packs[1].Message.GetLogger(), gs.Equals, "GoSpec")
+			c.Expect(packs[1].Message.GetSeverity(), gs.Equals, int32(6))
+
+			c.Expect(packs[2].Message.GetType(), gs.Equals, "TEST")
+			c.Expect(packs[2].Message.GetHostname(), gs.Equals, "my.host.name")
+			c.Expect(packs[2].Message.GetLogger(), gs.Equals, "GoSpec")
+			c.Expect(packs[2].Message.GetSeverity(), gs.Equals, int32(6))
+
 			decoder.Shutdown()
 		})
 	})
 
 	c.Specify("JSON decoder", func() {
 		decoder := new(SandboxDecoder)
+		decoder.debug = true
 		decoder.SetPipelineConfig(pConfig)
 		conf := decoder.ConfigStruct().(*sandbox.SandboxConfig)
 		conf.ScriptFilename = "../lua/decoders/json.lua"
