@@ -75,6 +75,10 @@ type LuaSandbox struct {
 func makePluginConfigString(pConf map[string]interface{}) string {
 	var confStrs []string
 	for k, v := range pConf {
+		// Don't let user config change the sandbox security.
+		if k == "override_restricted_headers" {
+			continue
+		}
 		var confStr string
 		switch u := v.(type) {
 		case string:
@@ -135,6 +139,9 @@ func CreateLuaSandbox(conf *sandbox.SandboxConfig, stateFile string) (sandbox.Sa
 		strings.Join(lua_cpath, ";"),
 		makePluginConfigString(conf.Config),
 	)
+	if conf.PluginType == "decoder" {
+		cfg = fmt.Sprintf("%s\n%s", cfg, "override_restricted_headers = true")
+	}
 	ccfg := C.CString(cfg)
 	defer C.free(unsafe.Pointer(ccfg))
 

@@ -216,7 +216,7 @@ function process_message()
     msg.Fields = flat
 
     if not pcall(inject_message, msg) then
-      return -1, "Failed to inject message."
+        return -1, "Failed to inject message."
     end
 
     return 0
