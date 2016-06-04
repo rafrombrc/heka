@@ -194,6 +194,15 @@ func populateMissingHeaders(newMsg *message.Message, original *message.Message) 
 	return changed
 }
 
+func (s *SandboxDecoder) adjustTimestamp(pack *pipeline.PipelinePack) {
+	const layout = "2006-01-02T15:04:05.999999999" // remove the incorrect UTC tz info
+	t := time.Unix(0, pack.Message.GetTimestamp())
+	t = t.In(time.UTC)
+	ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
+	pack.Message.SetTimestamp(ct.UnixNano())
+	pack.TrustMsgBytes = false
+}
+
 func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 	if s.sb != nil {
 		return // no-op already initialized
@@ -262,6 +271,9 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 			// If injections fail to set the standard headers, use the values
 			// from the original message.
 			s.pack.TrustMsgBytes = !populateMissingHeaders(s.pack.Message, original)
+			if s.tz != time.UTC {
+				s.adjustTimestamp(s.pack)
+			}
 			s.packs = append(s.packs, s.pack)
 			s.pack = nil
 			return 0
@@ -283,11 +295,7 @@ func (s *SandboxDecoder) SetDecoderRunner(dr pipeline.DecoderRunner) {
 		}
 
 		if s.tz != time.UTC {
-			const layout = "2006-01-02T15:04:05.999999999" // remove the incorrect UTC tz info
-			t := time.Unix(0, s.pack.Message.GetTimestamp())
-			t = t.In(time.UTC)
-			ct, _ := time.ParseInLocation(layout, t.Format(layout), s.tz)
-			s.pack.Message.SetTimestamp(ct.UnixNano())
+			s.adjustTimestamp(s.pack)
 		}
 
 		s.packs = append(s.packs, s.pack)
